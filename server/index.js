@@ -1,13 +1,27 @@
-// server/index.js — usa fetch nativo de Node 22 (sin node-fetch)
+// server/index.js — Express proxy con streaming (SSE) para Groq
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:5173' }));
+
+// CORS: ajustá TU_USUARIO y TU_REPO si vas a usar GitHub Pages
+const allowed = [
+  'http://localhost:5173',
+  'https://TU_USUARIO.github.io',
+  'https://TU_USUARIO.github.io/TU_REPO',
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // curl/health
+    if (allowed.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS blocked: ' + origin));
+  }
+}));
+
 app.use(express.json());
 
-// Health check
+// Health
 app.get('/health', (req, res) => {
   const g = process.env.GROQ_API_KEY || '';
   const x = process.env.XAI_API_KEY || '';
@@ -21,93 +35,65 @@ app.get('/health', (req, res) => {
   });
 });
 
-const PROVIDER = process.env.PROVIDER || 'groq'; 
+// === Streaming SSE ===
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, model, temperature = 0.7 } = req.body || {};
+    const { messages, model = 'llama-3.1-8b-instant', temperature = 0.7 } = req.body || {};
 
-    let url, headers, body;
-    if (PROVIDER === 'xai') {
-      url = 'https://api.x.ai/v1/chat/completions';
-      headers = {
-        'Authorization': `Bearer ${process.env.XAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      };
-      body = JSON.stringify({
-        model: model || 'grok-4',
-        messages,
-        temperature,
-        stream: true
-      });
-    } else {
-      url = 'https://api.groq.com/openai/v1/chat/completions';
-      headers = {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      };
-      body = JSON.stringify({
-        model: model || 'llama-3.1-8b-instant',
-        messages,
-        temperature,
-        stream: true
-      });
-    }
-
-    // fetch nativo de Node 22
-    const upstream = await fetch(url, { method: 'POST', headers, body });
-
-    if (!upstream.ok || !upstream.body) {
-      const text = await upstream.text().catch(() => '');
-      res.status(upstream.status || 500).json({
-        error: 'upstream_error',
-        status: upstream.status,
-        body: text
-      });
-      return;
-    }
-
-    // Cabeceras SSE
+    // Cabeceras SSE (importante para proxies)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // evitar buffering en proxies
+    res.flushHeaders?.();
 
-    // Streaming con Web ReadableStream (getReader existe en fetch nativo)
+    const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model, messages, temperature, stream: true }),
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      const text = await upstream.text().catch(() => '');
+      res.write(`data: ${JSON.stringify({ error: 'upstream_error', status: upstream.status, body: text })}\n\n`);
+      return res.end();
+    }
+
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       res.write(decoder.decode(value, { stream: true }));
     }
+
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
     console.error('Proxy error /api/chat:', err);
-    try { res.status(500).json({ error: 'proxy_error' }); } catch {}
+    try { res.write(`data: ${JSON.stringify({ error: 'proxy_error' })}\n\n`); } catch {}
+    res.end();
   }
 });
 
-// Endpoint de debug SIN streaming 
+// === No streaming (debug) ===
 app.post('/api/chat-nostream', async (req, res) => {
   try {
-    const { messages, model, temperature = 0.7 } = req.body || {};
-    let url, headers, body;
-    if (PROVIDER === 'xai') {
-      url = 'https://api.x.ai/v1/chat/completions';
-      headers = {
-        'Authorization': `Bearer ${process.env.XAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      };
-      body = JSON.stringify({ model: model || 'grok-4', messages, temperature, stream: false });
-    } else {
-      url = 'https://api.groq.com/openai/v1/chat/completions';
-      headers = {
+    const { messages, model = 'llama-3.1-8b-instant', temperature = 0.7 } = req.body || {};
+
+    const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
         'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      };
-      body = JSON.stringify({ model: model || 'llama-3.1-8b-instant', messages, temperature, stream: false });
-    }
-    const upstream = await fetch(url, { method: 'POST', headers, body });
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model, messages, temperature, stream: false }),
+    });
+
     const text = await upstream.text();
     res.status(upstream.status).type('application/json').send(text);
   } catch (err) {
