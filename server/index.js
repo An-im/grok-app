@@ -5,11 +5,9 @@ import cors from 'cors';
 
 const app = express();
 
-// CORS: ajustá TU_USUARIO y TU_REPO si vas a usar GitHub Pages
 const allowed = [
   'http://localhost:5173',
   'https://an-im.github.io',
-  'https://an-im.github.io/grok-app',
 ];
 app.use(cors({
   origin: (origin, cb) => {
