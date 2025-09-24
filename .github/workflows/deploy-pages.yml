@@ -10,21 +10,31 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # Instala deps y build dentro de /web
       - run: npm ci
-      # Inyecta la URL de tu backend (Render) en el build
-      - run: echo "VITE_API_BASE=${{ secrets.VITE_API_BASE }}" >> .env.production
+        working-directory: web
+
+      # Inyecta VITE_API_BASE solo para este paso (más simple que escribir .env.production)
       - run: npm run build
+        working-directory: web
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+
+      # Sube el artefacto desde web/dist
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
