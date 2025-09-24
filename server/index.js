@@ -21,17 +21,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// === Elige PROVEEDOR: GROQ (gratis) o XAI (requiere créditos) ===
-const PROVIDER = process.env.PROVIDER || 'groq'; // 'groq' | 'xai'
-
-// Endpoint común con streaming SSE
+const PROVIDER = process.env.PROVIDER || 'groq'; 
 app.post('/api/chat', async (req, res) => {
   try {
     const { messages, model, temperature = 0.7 } = req.body || {};
 
     let url, headers, body;
     if (PROVIDER === 'xai') {
-      // xAI (Grok) — necesita XAI_API_KEY=xa-... y créditos
       url = 'https://api.x.ai/v1/chat/completions';
       headers = {
         'Authorization': `Bearer ${process.env.XAI_API_KEY}`,
@@ -44,7 +40,6 @@ app.post('/api/chat', async (req, res) => {
         stream: true
       });
     } else {
-      // GROQ (gratis) — usa GROQ_API_KEY=gsk-...
       url = 'https://api.groq.com/openai/v1/chat/completions';
       headers = {
         'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
@@ -92,7 +87,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Endpoint de debug SIN streaming (útil para ver errores claros)
+// Endpoint de debug SIN streaming 
 app.post('/api/chat-nostream', async (req, res) => {
   try {
     const { messages, model, temperature = 0.7 } = req.body || {};

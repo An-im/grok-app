@@ -8,8 +8,7 @@ const res = await fetch('https://api.x.ai/v1/chat/completions', {
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    // Cambia el modelo si quieres (ej: grok-4, grok-4-fast, grok-3, etc.)
-    // Revisa los modelos disponibles y precios en la doc oficial.
+    
     model: 'grok-4',
     messages: [{ role: 'user', content: 'Dime hola en español en 3 palabras.' }]
   })

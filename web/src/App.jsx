@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
+
 // Paletas rápidas por tema
 const THEMES = {
   cozy: {
@@ -75,7 +77,7 @@ export default function App() {
     setMessages(m => [...m, { role: 'assistant', content: '' }]);
 
     try {
-      const resp = await fetch('http://localhost:8787/api/chat', {
+      const resp = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -142,7 +144,7 @@ export default function App() {
     const last = [...messages].reverse().find(m => m.role === 'assistant');
     if (last?.content) await navigator.clipboard.writeText(last.content);
   };
-  // 1) Cargar estado inicial (arriba de todo, antes del return)
+  
 useEffect(() => {
   const saved = JSON.parse(localStorage.getItem('appState') || '{}');
   if (saved.messages) setMessages([{ role:'system', content:'Eres un asistente útil y conciso.' }, ...saved.messages]);
@@ -150,7 +152,7 @@ useEffect(() => {
   if (typeof saved.isDark === 'boolean') setIsDark(saved.isDark);
 }, []);
 
-// 2) Persistir cada vez que cambie algo importante
+
 useEffect(() => {
   localStorage.setItem('appState', JSON.stringify({
     messages: messages.filter(m => m.role !== 'system'),
@@ -219,7 +221,7 @@ useEffect(() => {
         <div className="h-[65vh] md:h-[70vh] overflow-y-auto border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 bg-white/75 dark:bg-neutral-900/50 shadow-sm">
           {messages.filter(m => m.role !== 'system').map((m, i) => {
             const isUser = m.role === 'user';
-                    
+
             return (
               <div key={i} className={`mb-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2 leading-relaxed shadow-sm ${isUser ? T.user : T.ai}`}>
@@ -229,7 +231,7 @@ useEffect(() => {
             
                   <div className="whitespace-pre-wrap">{m.content}</div>
             
-                  {/* timestamp dentro de la burbuja */}
+                  {/* timestamp */}
                   <div className="text-[10px] opacity-60 mt-1">
                     {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
