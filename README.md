@@ -23,6 +23,9 @@ En otra (frontend):
 - `server/index.js` → proxy SSE
 - `web/` → React + Tailwind
 
+### Demo
+👉 [Live demo](https://an-im.github.io/grok-app/) · [Código](https://github.com/An-im/grok-app)
+
+
 ## Notas
-- No subas tu `.env` al repo.
 - Vite 7 requiere Node 20.19+ (usamos Node 22).
